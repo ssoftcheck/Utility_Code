@@ -1,8 +1,8 @@
-require(lubridate)
-require(data.table)
-require(iterators)
-require(foreach)
-require(doMC)
+library(lubridate)
+library(data.table)
+library(iterators)
+library(foreach)
+tryCatch({library(doMC)}, error =function(e) {library(doParallel)})
 
 fullRank = function(x) {
 	z = qr(x)
