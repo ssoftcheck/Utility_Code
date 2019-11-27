@@ -1,6 +1,7 @@
-require(data.table)
-require(hashmap)
-require(progress)
+library(data.table)
+library(hashmap)
+library(progress)
+library(parallel)
 
 lookup = function(vars,xdata,yvar,wvar=NULL,threads=1) {
   result = vector(mode='list',length = length(vars))
@@ -75,17 +76,16 @@ applyLookup = function(xdata,input,yvar,train=NULL,trainvalue=NULL,wvar=NULL,jit
           rm(hv,hw)
         }
         else {
-          temp = temp[input[[v]],on=v, c("value", "weight") := mget(paste0("i.",c("value", "weight")))]
+          temp[input[[v]],on=v, c("value", "weight") := mget(paste0("i.",c("value", "weight")))]
         }
+        temp[,calc := (value - ifelse(isTrain,get(yvar),0) + ifelse(isTrain,meanWeight * input$popMean,0)) / ifelse(isTrain,(weight - 1 + meanWeight),weight)]
+        temp[is.na(calc),calc := input$popMean]
+        temp[isTrain, calc := jitter(calc,amount=jitter)]
+        result[[v]] = temp$calc
+        
+        rm(temp)
+        pb$tick()
       }
-      
-      temp[,calc := (value - ifelse(isTrain,get(yvar),0) + ifelse(isTrain,meanWeight * input$popMean,0)) / ifelse(isTrain,(weight - 1 + meanWeight),weight)]
-      temp[is.na(calc),calc := input$popMean]
-      temp[isTrain, calc := jitter(calc,amount=jitter)]
-      result[[v]] = temp$calc
-      
-      rm(temp)
-      pb$tick()
     }
     else {
       if(any(is.na(xdata[[wvar]]))) {
@@ -166,7 +166,7 @@ applyLookup = function(xdata,input,yvar,train=NULL,trainvalue=NULL,wvar=NULL,jit
       names(result) = vars
     }
   }
-    result = as.data.table(result)
-    setnames(result,names(result),paste('meancode',yvar,names(result),sep='.'))
-    return(result)
+  result = as.data.table(result)
+  setnames(result,names(result),paste('meancode',yvar,names(result),sep='.'))
+  return(result)
 }
